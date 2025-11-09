@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SocialFlow | Next-Gen Video Platform</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ff2d55">
+    <style>
+        /* CSS değişkenleri ve temel stiller aynı kalacak */
+        :root {
+            --primary: #ff2d55;
+            --secondary: #5856d6;
+            --bg-dark: #000000;
+            --bg-card: #1c1c1e;
+            --text-light: #ffffff;
+            --text-gray: #8e8e93;
+            --border: #2c2c2e;
+            --success: #4cd964;
+            --warning: #ffcc00;
+            --danger: #ff3b30;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --transition: all 0.3s ease;
+            --shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        /* Mevcut CSS kodları burada kalacak, sadece kritik iyileştirmeler yapılacak */
+        
+        /* Performance optimizations */
+        .video-container {
+            contain: layout style paint;
+            will-change: transform;
+        }
+
+        .media-image {
+            content-visibility: auto;
+        }
+
+        /* Accessibility improvements */
+        .btn:focus-visible,
+        .form-input:focus-visible,
+        .nav-item:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* High contrast support */
+        @media (prefers-contrast: high) {
+            :root {
+                --border: #ffffff;
+                --text-gray: #ffffff;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Error Boundary -->
+    <div class="error-boundary" id="errorBoundary">
+        <div class="error-content">
+            <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h2 class="error-title">Bir Hata Oluştu</h2>
+            <p class="error-message">Uygulamada beklenmeyen bir hata oluştu. Lütfen sayfayı yenileyin.</p>
+            <div class="error-details" id="errorDetails"></div>
+            <button class="btn" onclick="location.reload()">
+                <i class="fas fa-redo"></i> Sayfayı Yenile
+            </button>
+        </div>
+    </div>
+
+    <!-- Mevcut HTML yapısı korunacak, sadece JavaScript komple değişecek -->
+
+    <script type="module">
+        // ==================== MODULE IMPORTS ====================
+        import { VideoPlayer } from './modules/VideoPlayer.js';
+        import { AuthManager } from './modules/AuthManager.js';
+        import { StateManager } from './modules/StateManager.js';
+        import { ErrorBoundary } from './modules/ErrorBoundary.js';
+        import { PerformanceMonitor } from './modules/PerformanceMonitor.js';
+        import { SecurityManager } from './modules/SecurityManager.js';
+        import { 
+            formatCount, 
+            formatTime, 
+            debounce, 
+            throttle,
+            sanitizeHTML 
+        } from './utils/helpers.js';
+
+        // ==================== MAIN APPLICATION ====================
+        class SocialFlowApp {
+            constructor() {
+                this.stateManager = new StateManager();
+                this.errorBoundary = new ErrorBoundary();
+                this.authManager = new AuthManager();
+                this.performanceMonitor = new PerformanceMonitor();
+                this.securityManager = new SecurityManager();
+                
+                this.videoPlayers = new Map();
+                this.currentPage = 'home';
+                this.isInitialized = false;
+            }
+
+            async init() {
+                try {
+                    this.performanceMonitor.startMonitoring();
+                    
+                    // Error boundary'yi başlat
+                    this.errorBoundary.init();
+                    
+                    // State manager'ı başlat
+                    await this.stateManager.init();
+                    
+                    // Auth durumunu kontrol et
+                    await this.authManager.checkAuthStatus();
+                    
+                    // Event listener'ları kur
+                    this.setupEventListeners();
+                    
+                    // UI'ı başlat
+                    this.initializeUI();
+                    
+                    // Performance optimizasyonları
+                    this.setupPerformanceOptimizations();
+                    
+                    this.isInitialized = true;
+                    console.log('SocialFlow App initialized successfully');
+                    
+                } catch (error) {
+                    this.errorBoundary.handleError(error);
+                    throw error;
+                }
+            }
+
+            setupEventListeners() {
+                // Global event listener'lar
+                document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
+                window.addEventListener('online', this.handleOnlineStatus.bind(this));
+                window.addEventListener('offline', this.handleOnlineStatus.bind(this));
+                
+                // Theme toggle
+                document.getElementById('themeToggle')?.addEventListener('click', this.toggleTheme.bind(this));
+                
+                // Navigation
+                document.querySelectorAll('[data-page]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const page = e.currentTarget.dataset.page;
+                        this.switchPage(page);
+                    });
+                });
+            }
+
+            initializeUI() {
+                // Welcome screen kontrolü
+                if (this.authManager.isAuthenticated || this.authManager.isDemoMode) {
+                    this.showMainApp();
+                } else {
+                    this.showWelcomeScreen();
+                }
+            }
+
+            showMainApp() {
+                document.getElementById('welcomeScreen').style.display = 'none';
+                document.getElementById('mainHeader').style.display = 'flex';
+                document.getElementById('mainContent').style.display = 'block';
+                document.getElementById('bottomNav').style.display = 'flex';
+                
+                this.loadCurrentPage();
+            }
+
+            showWelcomeScreen() {
+                document.getElementById('welcomeScreen').style.display = 'flex';
+                document.getElementById('mainHeader').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'none';
+                document.getElementById('bottomNav').style.display = 'none';
+            }
+
+            async switchPage(page) {
+                if (this.currentPage === page) return;
+                
+                // Önceki sayfayı temizle
+                await this.cleanupPage(this.currentPage);
+                
+                // Yeni sayfayı yükle
+                this.currentPage = page;
+                await this.loadCurrentPage();
+            }
+
+            async loadCurrentPage() {
+                switch (this.currentPage) {
+                    case 'home':
+                        await this.loadHomePage();
+                        break;
+                    case 'profile':
+                        await this.loadProfilePage();
+                        break;
+                    case 'analytics':
+                        await this.loadAnalyticsPage();
+                        break;
+                    case 'explore':
+                        await this.loadExplorePage();
+                        break;
+                }
+            }
+
+            async loadHomePage() {
+                try {
+                    const videos = await this.stateManager.getVideos();
+                    this.renderVideoFeed(videos);
+                } catch (error) {
+                    this.errorBoundary.handleError(error, 'Video feed yüklenirken hata oluştu');
+                }
+            }
+
+            renderVideoFeed(videos) {
+                const feed = document.getElementById('videoFeed');
+                if (!feed) return;
+
+                // Virtual scrolling için sadece görünür videoları render et
+                const visibleVideos = this.getVisibleVideos(videos);
+                
+                feed.innerHTML = visibleVideos.map((video, index) => 
+                    this.createVideoElement(video, index)
+                ).join('');
+
+                // Video player'ları initialize et
+                this.initializeVideoPlayers();
+            }
+
+            createVideoElement(video, index) {
+                // XSS korumalı HTML oluşturma
+                return sanitizeHTML`
+                    <div class="video-container" data-video-id="${video.id}" data-video-index="${index}">
+                        <div class="video-player-container">
+                            ${this.createMediaGallery(video)}
+                            ${this.createVideoOverlay(video)}
+                            ${this.createVideoActions(video)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            createMediaGallery(video) {
+                const currentIndex = this.stateManager.getCurrentMediaIndex(video.id);
+                
+                return sanitizeHTML`
+                    <div class="media-gallery">
+                        <div class="media-container" style="transform: translateX(-${currentIndex * 100}%)">
+                            ${video.media.map((media, mediaIndex) => `
+                                <div class="media-item ${mediaIndex === currentIndex ? 'active' : ''}">
+                                    ${media.type === 'video' ? 
+                                        `<video data-src="${media.url}" preload="none" playsinline muted></video>` :
+                                        `<img data-src="${media.thumbnail}" alt="${video.caption}" loading="lazy">`
+                                    }
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${video.media.length > 1 ? this.createGalleryControls(video, currentIndex) : ''}
+                    </div>
+                `;
+            }
+
+            createGalleryControls(video, currentIndex) {
+                return sanitizeHTML`
+                    <div class="gallery-controls">
+                        <div class="gallery-indicator">
+                            ${video.media.map((_, i) => `
+                                <button class="indicator-dot ${i === currentIndex ? 'active' : ''}" 
+                                        onclick="app.switchMedia('${video.id}', ${i})"
+                                        aria-label="${i + 1}. medyaya geç">
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="media-count">
+                            ${currentIndex + 1} / ${video.media.length}
+                        </div>
+                    </div>
+                `;
+            }
+
+            initializeVideoPlayers() {
+                document.querySelectorAll('.video-container').forEach(container => {
+                    const videoId = container.dataset.videoId;
+                    if (!this.videoPlayers.has(videoId)) {
+                        const player = new VideoPlayer(container);
+                        this.videoPlayers.set(videoId, player);
+                    }
+                });
+            }
+
+            async switchMedia(videoId, mediaIndex) {
+                try {
+                    this.stateManager.setCurrentMediaIndex(videoId, mediaIndex);
+                    
+                    const player = this.videoPlayers.get(videoId);
+                    if (player) {
+                        await player.switchMedia(mediaIndex);
+                    }
+                    
+                    this.updateGalleryUI(videoId, mediaIndex);
+                } catch (error) {
+                    this.errorBoundary.handleError(error, 'Medya değiştirilirken hata oluştu');
+                }
+            }
+
+            handleVisibilityChange() {
+                if (document.hidden) {
+                    // Sayfa gizlendiğinde videoları duraklat
+                    this.pauseAllVideos();
+                }
+            }
+
+            handleOnlineStatus() {
+                const isOnline = navigator.onLine;
+                this.stateManager.setOnlineStatus(isOnline);
+                
+                if (isOnline) {
+                    this.syncOfflineData();
+                }
+            }
+
+            async syncOfflineData() {
+                // Çevrimdışı verileri senkronize et
+                try {
+                    await this.stateManager.syncPendingActions();
+                    showToast('Çevrimdışı veriler senkronize edildi');
+                } catch (error) {
+                    console.warn('Offline sync failed:', error);
+                }
+            }
+
+            pauseAllVideos() {
+                this.videoPlayers.forEach(player => {
+                    player.pause();
+                });
+            }
+
+            setupPerformanceOptimizations() {
+                // Intersection Observer for lazy loading
+                this.setupLazyLoading();
+                
+                // Memory monitoring
+                this.setupMemoryMonitoring();
+                
+                // Prefetch critical resources
+                this.prefetchResources();
+            }
+
+            setupLazyLoading() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const videoContainer = entry.target;
+                            this.loadVideoContent(videoContainer);
+                            observer.unobserve(videoContainer);
+                        }
+                    });
+                }, { rootMargin: '100px 0px' });
+
+                document.querySelectorAll('.video-container').forEach(container => {
+                    observer.observe(container);
+                });
+            }
+
+            async loadVideoContent(container) {
+                const videoId = container.dataset.videoId;
+                const player = this.videoPlayers.get(videoId);
+                
+                if (player) {
+                    await player.load();
+                }
+            }
+
+            cleanup() {
+                // Tüm kaynakları temizle
+                this.videoPlayers.forEach(player => player.destroy());
+                this.videoPlayers.clear();
+                
+                this.stateManager.cleanup();
+                this.performanceMonitor.stopMonitoring();
+            }
+        }
+
+        // ==================== MODULE DEFINITIONS ====================
+
+        // State Manager
+        class StateManager {
+            constructor() {
+                this.state = {
+                    user: null,
+                    videos: [],
+                    likedVideos: new Set(),
+                    savedVideos: new Set(),
+                    currentMediaIndexes: new Map(),
+                    online: true,
+                    pendingActions: []
+                };
+            }
+
+            async init() {
+                await this.loadFromStorage();
+                this.setupStorageSync();
+            }
+
+            async loadFromStorage() {
+                try {
+                    const [
+                        user, 
+                        likedVideos, 
+                        savedVideos, 
+                        mediaIndexes
+                    ] = await Promise.all([
+                        this.getStorage('user'),
+                        this.getStorage('likedVideos'),
+                        this.getStorage('savedVideos'),
+                        this.getStorage('currentMediaIndexes')
+                    ]);
+
+                    this.state.user = user;
+                    this.state.likedVideos = new Set(likedVideos || []);
+                    this.state.savedVideos = new Set(savedVideos || []);
+                    this.state.currentMediaIndexes = new Map(Object.entries(mediaIndexes || {}));
+                } catch (error) {
+                    console.error('Storage load error:', error);
+                }
+            }
+
+            async getVideos() {
+                if (this.state.videos.length === 0) {
+                    await this.fetchVideos();
+                }
+                return this.state.videos;
+            }
+
+            async fetchVideos() {
+                try {
+                    // API call veya demo veri
+                    const response = await this.apiRequest('/videos');
+                    this.state.videos = response.data.videos;
+                    return this.state.videos;
+                } catch (error) {
+                    console.error('Video fetch error:', error);
+                    return this.getDemoVideos();
+                }
+            }
+
+            getDemoVideos() {
+                // Demo video verileri
+                return [...];
+            }
+
+            setCurrentMediaIndex(videoId, index) {
+                this.state.currentMediaIndexes.set(videoId, index);
+                this.saveToStorage('currentMediaIndexes', 
+                    Object.fromEntries(this.state.currentMediaIndexes));
+            }
+
+            getCurrentMediaIndex(videoId) {
+                return this.state.currentMediaIndexes.get(videoId) || 0;
+            }
+
+            async likeVideo(videoId) {
+                const isLiked = this.state.likedVideos.has(videoId);
+                
+                if (isLiked) {
+                    this.state.likedVideos.delete(videoId);
+                } else {
+                    this.state.likedVideos.add(videoId);
+                }
+
+                await this.saveToStorage('likedVideos', [...this.state.likedVideos]);
+                
+                // API call
+                if (this.state.online) {
+                    await this.apiRequest(`/videos/${videoId}/like`, {
+                        method: 'PATCH'
+                    });
+                } else {
+                    this.queueAction('like', { videoId, liked: !isLiked });
+                }
+
+                return !isLiked;
+            }
+
+            queueAction(type, data) {
+                this.state.pendingActions.push({ type, data, timestamp: Date.now() });
+                this.saveToStorage('pendingActions', this.state.pendingActions);
+            }
+
+            async syncPendingActions() {
+                while (this.state.pendingActions.length > 0) {
+                    const action = this.state.pendingActions[0];
+                    try {
+                        await this.processAction(action);
+                        this.state.pendingActions.shift();
+                    } catch (error) {
+                        console.error('Action sync failed:', error);
+                        break;
+                    }
+                }
+                await this.saveToStorage('pendingActions', this.state.pendingActions);
+            }
+
+            async processAction(action) {
+                switch (action.type) {
+                    case 'like':
+                        await this.apiRequest(`/videos/${action.data.videoId}/like`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ liked: action.data.liked })
+                        });
+                        break;
+                    // Diğer action türleri...
+                }
+            }
+
+            setupStorageSync() {
+                // Storage değişikliklerini senkronize et
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'socialflow_state') {
+                        this.loadFromStorage();
+                    }
+                });
+            }
+
+            async saveToStorage(key, value) {
+                try {
+                    localStorage.setItem(`socialflow_${key}`, JSON.stringify(value));
+                } catch (error) {
+                    console.error('Storage save error:', error);
+                }
+            }
+
+            async getStorage(key) {
+                try {
+                    const item = localStorage.getItem(`socialflow_${key}`);
+                    return item ? JSON.parse(item) : null;
+                } catch (error) {
+                    console.error('Storage get error:', error);
+                    return null;
+                }
+            }
+
+            cleanup() {
+                // Cleanup logic
+            }
+        }
+
+        // Video Player Module
+        class VideoPlayer {
+            constructor(container) {
+                this.container = container;
+                this.videoId = container.dataset.videoId;
+                this.mediaElements = [];
+                this.currentMediaIndex = 0;
+                this.isPlaying = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.setupMediaElements();
+                this.setupEventListeners();
+                this.setupIntersectionObserver();
+            }
+
+            setupMediaElements() {
+                this.mediaElements = Array.from(this.container.querySelectorAll('video, img'));
+                
+                this.mediaElements.forEach(media => {
+                    if (media.tagName === 'VIDEO') {
+                        this.setupVideoElement(media);
+                    } else {
+                        this.setupImageElement(media);
+                    }
+                });
+            }
+
+            setupVideoElement(video) {
+                video.preload = 'metadata';
+                video.playsInline = true;
+                video.muted = true;
+                video.disablePictureInPicture = true;
+                
+                // Performance optimizations
+                video.addEventListener('loadstart', this.handleLoadStart.bind(this));
+                video.addEventListener('canplay', this.handleCanPlay.bind(this));
+                video.addEventListener('error', this.handleError.bind(this));
+            }
+
+            setupIntersectionObserver() {
+                this.intersectionObserver = new IntersectionObserver(
+                    (entries) => {
+                        entries.forEach(entry => {
+                            if (!entry.isIntersecting) {
+                                this.pause();
+                            }
+                        });
+                    },
+                    { threshold: 0.5 }
+                );
+
+                this.intersectionObserver.observe(this.container);
+            }
+
+            async load() {
+                const currentMedia = this.mediaElements[this.currentMediaIndex];
+                
+                if (currentMedia && currentMedia.dataset.src) {
+                    currentMedia.src = currentMedia.dataset.src;
+                    delete currentMedia.dataset.src;
+                    
+                    if (currentMedia.tagName === 'VIDEO') {
+                        await currentMedia.load();
+                    }
+                }
+            }
+
+            async play() {
+                const currentMedia = this.mediaElements[this.currentMediaIndex];
+                
+                if (currentMedia?.tagName === 'VIDEO') {
+                    try {
+                        await currentMedia.play();
+                        this.isPlaying = true;
+                    } catch (error) {
+                        console.error('Video play failed:', error);
+                    }
+                }
+            }
+
+            pause() {
+                const currentMedia = this.mediaElements[this.currentMediaIndex];
+                
+                if (currentMedia?.tagName === 'VIDEO') {
+                    currentMedia.pause();
+                    this.isPlaying = false;
+                }
+            }
+
+            async switchMedia(index) {
+                if (index === this.currentMediaIndex) return;
+                
+                // Mevcut medyayı duraklat
+                this.pause();
+                
+                // Yeni medyaya geç
+                this.currentMediaIndex = index;
+                
+                // Yeni medyayı yükle ve oynat
+                await this.load();
+                await this.play();
+            }
+
+            destroy() {
+                this.pause();
+                this.intersectionObserver?.disconnect();
+                
+                // Event listener'ları temizle
+                this.mediaElements.forEach(media => {
+                    if (media.tagName === 'VIDEO') {
+                        media.removeEventListener('loadstart', this.handleLoadStart);
+                        media.removeEventListener('canplay', this.handleCanPlay);
+                        media.removeEventListener('error', this.handleError);
+                    }
+                });
+            }
+        }
+
+        // Error Boundary Module
+        class ErrorBoundary {
+            constructor() {
+                this.isActive = false;
+            }
+
+            init() {
+                window.addEventListener('error', this.handleGlobalError.bind(this));
+                window.addEventListener('unhandledrejection', this.handlePromiseRejection.bind(this));
+                
+                this.isActive = true;
+            }
+
+            handleGlobalError(event) {
+                event.preventDefault();
+                this.showError('Runtime Error', event.error);
+                this.reportError(event.error);
+                return false;
+            }
+
+            handlePromiseRejection(event) {
+                event.preventDefault();
+                this.showError('Promise Rejection', event.reason);
+                this.reportError(event.reason);
+                return false;
+            }
+
+            showError(title, error) {
+                if (!this.isActive) return;
+                
+                const errorDetails = this.sanitizeError(error);
+                const errorBoundary = document.getElementById('errorBoundary');
+                
+                if (errorBoundary) {
+                    errorBoundary.querySelector('#errorDetails').textContent = errorDetails;
+                    errorBoundary.classList.add('active');
+                }
+            }
+
+            sanitizeError(error) {
+                // Production'da hassas bilgileri filtrele
+                if (process.env.NODE_ENV === 'production') {
+                    return 'Bir hata oluştu. Lütfen sayfayı yenileyin.';
+                }
+                
+                return error instanceof Error ? 
+                    `${error.name}: ${error.message}\n${error.stack}` : 
+                    String(error);
+            }
+
+            reportError(error) {
+                // Error reporting service'e gönder
+                if (window.gtag) {
+                    gtag('event', 'exception', {
+                        description: error.message,
+                        fatal: true
+                    });
+                }
+            }
+        }
+
+        // Performance Monitor Module
+        class PerformanceMonitor {
+            constructor() {
+                this.metrics = new Map();
+                this.observer = null;
+            }
+
+            startMonitoring() {
+                this.observeLongTasks();
+                this.monitorMemory();
+                this.trackCoreWebVitals();
+            }
+
+            observeLongTasks() {
+                if ('PerformanceObserver' in window) {
+                    this.observer = new PerformanceObserver((list) => {
+                        for (const entry of list.getEntries()) {
+                            if (entry.duration > 50) {
+                                console.warn('Long task detected:', entry);
+                                this.reportPerformanceIssue('long_task', entry);
+                            }
+                        }
+                    });
+
+                    this.observer.observe({ entryTypes: ['longtask'] });
+                }
+            }
+
+            monitorMemory() {
+                if (performance.memory) {
+                    setInterval(() => {
+                        const memory = performance.memory;
+                        const usedMB = memory.usedJSHeapSize / 1048576;
+                        
+                        if (usedMB > 100) {
+                            this.reportPerformanceIssue('high_memory', { usedMB });
+                        }
+                    }, 30000);
+                }
+            }
+
+            trackCoreWebVitals() {
+                // LCP, FID, CLS tracking
+                this.trackLCP();
+                this.trackFID();
+                this.trackCLS();
+            }
+
+            stopMonitoring() {
+                this.observer?.disconnect();
+            }
+        }
+
+        // Security Manager Module
+        class SecurityManager {
+            constructor() {
+                this.cspViolations = new Set();
+            }
+
+            init() {
+                this.setupCSP();
+                this.setupXSSProtection();
+                this.setupCSRFProtection();
+            }
+
+            setupCSP() {
+                // Content Security Policy header'ı simüle et
+                const meta = document.createElement('meta');
+                meta.httpEquiv = 'Content-Security-Policy';
+                meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;";
+                document.head.appendChild(meta);
+            }
+
+            setupXSSProtection() {
+                // XSS korumaları
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.sanitizeUserInputs();
+                });
+            }
+
+            sanitizeUserInputs() {
+                // Tüm user input'larını sanitize et
+                const inputs = document.querySelectorAll('input, textarea');
+                inputs.forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        e.target.value = this.sanitizeString(e.target.value);
+                    });
+                });
+            }
+
+            sanitizeString(str) {
+                return str
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#x27;')
+                    .replace(/\//g, '&#x2F;');
+            }
+
+            validateAuthToken(token) {
+                // JWT token validation
+                try {
+                    const parts = token.split('.');
+                    if (parts.length !== 3) return false;
+                    
+                    const payload = JSON.parse(atob(parts[1]));
+                    return payload.exp > Date.now() / 1000;
+                } catch {
+                    return false;
+                }
+            }
+        }
+
+        // Auth Manager Module
+        class AuthManager {
+            constructor() {
+                this.token = null;
+                this.user = null;
+                this.isDemoMode = false;
+            }
+
+            async checkAuthStatus() {
+                const token = localStorage.getItem('socialflow_token');
+                
+                if (token && this.validateToken(token)) {
+                    this.token = token;
+                    await this.fetchUserProfile();
+                } else {
+                    this.clearAuth();
+                }
+            }
+
+            validateToken(token) {
+                // Token validation logic
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    return payload.exp > Date.now() / 1000;
+                } catch {
+                    return false;
+                }
+            }
+
+            async login(credentials) {
+                try {
+                    const response = await this.apiRequest('/auth/login', {
+                        method: 'POST',
+                        body: JSON.stringify(credentials)
+                    });
+
+                    this.token = response.token;
+                    this.user = response.user;
+                    
+                    localStorage.setItem('socialflow_token', this.token);
+                    localStorage.setItem('socialflow_user', JSON.stringify(this.user));
+                    
+                    return response;
+                } catch (error) {
+                    this.clearAuth();
+                    throw error;
+                }
+            }
+
+            async enableDemoMode() {
+                this.isDemoMode = true;
+                this.user = this.createDemoUser();
+                localStorage.setItem('demo_mode', 'true');
+            }
+
+            clearAuth() {
+                this.token = null;
+                this.user = null;
+                this.isDemoMode = false;
+                
+                localStorage.removeItem('socialflow_token');
+                localStorage.removeItem('socialflow_user');
+                localStorage.removeItem('demo_mode');
+            }
+
+            get isAuthenticated() {
+                return !!(this.token || this.isDemoMode);
+            }
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+        const utils = {
+            formatCount(count) {
+                if (count >= 1000000) {
+                    return (count / 1000000).toFixed(1) + 'M';
+                } else if (count >= 1000) {
+                    return (count / 1000).toFixed(1) + 'K';
+                }
+                return count.toString();
+            },
+
+            formatTime(timestamp) {
+                if (!timestamp) return 'Bilinmiyor';
+                
+                const now = new Date();
+                const time = new Date(timestamp);
+                const diff = now - time;
+                
+                const minutes = Math.floor(diff / 60000);
+                const hours = Math.floor(diff / 3600000);
+                const days = Math.floor(diff / 86400000);
+                
+                if (minutes < 1) return 'Şimdi';
+                if (minutes < 60) return `${minutes} dakika önce`;
+                if (hours < 24) return `${hours} saat önce`;
+                if (days < 7) return `${days} gün önce`;
+                
+                return time.toLocaleDateString('tr-TR');
+            },
+
+            debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            },
+
+            throttle(func, limit) {
+                let inThrottle;
+                return function(...args) {
+                    if (!inThrottle) {
+                        func.apply(this, args);
+                        inThrottle = true;
+                        setTimeout(() => inThrottle = false, limit);
+                    }
+                };
+            },
+
+            sanitizeHTML(strings, ...values) {
+                return strings.reduce((result, str, i) => {
+                    const value = values[i] ?? '';
+                    return result + str + this.escapeHTML(value);
+                }, '');
+            },
+
+            escapeHTML(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+        };
+
+        // ==================== GLOBAL APP INSTANCE ====================
+        window.app = new SocialFlowApp();
+
+        // Uygulamayı başlat
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await window.app.init();
+            } catch (error) {
+                console.error('App initialization failed:', error);
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            window.app.cleanup();
+        });
+
+        // Utility functions'i global scope'a ekle
+        Object.assign(window, utils);
+    </script>
+</body>
+</html>
